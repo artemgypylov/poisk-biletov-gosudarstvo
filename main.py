@@ -4,6 +4,7 @@ Entry point for the subsidised-flight monitor.
 Usage:
     python main.py                      # runs once (suitable for GitHub Actions)
     python main.py --schedule           # runs on a 15-minute loop (suitable for VPS)
+    python main.py --dry-run            # runs once, logs found flights but skips Telegram
 
 Environment variables (set via .env or shell):
     BOT_TOKEN   — Telegram bot token
@@ -27,6 +28,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Imported here so dotenv is loaded first
+from config import validate as validate_config  # noqa: E402
 from db import already_notified, mark_notified, setup_db  # noqa: E402
 from notifier import notify  # noqa: E402
 from routes import WATCH_ROUTES  # noqa: E402
@@ -42,6 +44,9 @@ DAYS_AHEAD = int(os.environ.get("DAYS_AHEAD", "45"))
 # Delay range (seconds) between individual route+date requests
 MIN_DELAY = float(os.environ.get("MIN_DELAY", "3"))
 MAX_DELAY = float(os.environ.get("MAX_DELAY", "8"))
+
+# Set by --dry-run flag
+_DRY_RUN = False
 
 
 def check_all() -> None:
@@ -68,7 +73,14 @@ def check_all() -> None:
                         continue
                     if already_notified(flight.airline, origin, dest, dep_date_str):
                         continue
-                    notify(flight)
+                    if _DRY_RUN:
+                        logger.info(
+                            "[DRY-RUN] Would notify: %s %s→%s %s (%s)",
+                            flight.airline, origin, dest, dep_date_str,
+                            f"{flight.price} ₽" if flight.price else "цена неизвестна",
+                        )
+                    else:
+                        notify(flight)
                     mark_notified(flight.airline, origin, dest, dep_date_str, flight.price)
 
             except Exception as exc:
@@ -82,13 +94,24 @@ def check_all() -> None:
 
 
 def main() -> None:
+    global _DRY_RUN  # noqa: PLW0603
+
     parser = argparse.ArgumentParser(description="Subsidised flight monitor")
     parser.add_argument(
         "--schedule",
         action="store_true",
         help="Run on a repeating schedule (every 15 minutes) instead of once",
     )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Search for flights and log results but do not send Telegram notifications",
+    )
     args = parser.parse_args()
+    _DRY_RUN = args.dry_run
+
+    if not validate_config(require_telegram=not _DRY_RUN):
+        raise SystemExit(1)
 
     setup_db()
 
@@ -105,7 +128,7 @@ def main() -> None:
         check_all()  # immediate first run
         scheduler.start()
     else:
-        logger.info("Running single check pass.")
+        logger.info("Running single check pass%s.", " (dry-run)" if _DRY_RUN else "")
         check_all()
         logger.info("Done.")
 

@@ -1,0 +1,11 @@
+services:
+  monitor:
+    build: .
+    restart: unless-stopped
+    command: ["--schedule"]
+    env_file: .env
+    volumes:
+      - flight-data:/app/data
+
+volumes:
+  flight-data:
