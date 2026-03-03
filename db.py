@@ -12,7 +12,7 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-DB_PATH = Path(os.environ.get("DB_PATH", Path(__file__).parent / "flights.db"))
+DB_PATH = Path(os.environ.get("DB_PATH") or (Path(__file__).parent / "flights.db"))
 
 _CREATE_TABLE = """
 CREATE TABLE IF NOT EXISTS notified (

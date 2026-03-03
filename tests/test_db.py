@@ -5,9 +5,9 @@ import tempfile
 import pytest
 
 # Override DB_PATH before importing db module
-_tmp = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
-_tmp.close()
-os.environ["DB_PATH"] = _tmp.name
+_tmp_fd, _tmp_path = tempfile.mkstemp(suffix=".db")
+os.close(_tmp_fd)
+os.environ["DB_PATH"] = _tmp_path
 
 from db import already_notified, mark_notified, setup_db  # noqa: E402
 
@@ -15,13 +15,20 @@ from db import already_notified, mark_notified, setup_db  # noqa: E402
 @pytest.fixture(autouse=True)
 def _fresh_db():
     """Re-create a clean database for every test."""
-    # Remove leftover data from a prior test
     import sqlite3
     conn = sqlite3.connect(os.environ["DB_PATH"])
     conn.execute("DROP TABLE IF EXISTS notified")
     conn.close()
     setup_db()
     yield
+
+
+def teardown_module():
+    """Remove the temporary database file."""
+    try:
+        os.unlink(_tmp_path)
+    except OSError:
+        pass
 
 
 def test_setup_creates_table():

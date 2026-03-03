@@ -1,5 +1,4 @@
 """Tests for the Telegram notifier (notifier.py)."""
-import os
 from datetime import date
 from unittest.mock import patch, MagicMock
 
@@ -52,8 +51,7 @@ def test_notify_sends_message(mock_post, sample_flight, monkeypatch):
     notify(sample_flight)
 
     mock_post.assert_called_once()
-    call_kwargs = mock_post.call_args
-    payload = call_kwargs.kwargs.get("json") or call_kwargs[1].get("json")
+    payload = mock_post.call_args.kwargs["json"]
     assert payload["chat_id"] == "999"
     assert "S7" in payload["text"]
     assert "7,500 ₽" in payload["text"]
@@ -70,5 +68,5 @@ def test_notify_no_price(mock_post, sample_flight, monkeypatch):
     sample_flight.price = None
     notify(sample_flight)
 
-    payload = mock_post.call_args.kwargs.get("json") or mock_post.call_args[1].get("json")
+    payload = mock_post.call_args.kwargs["json"]
     assert "цена неизвестна" in payload["text"]
