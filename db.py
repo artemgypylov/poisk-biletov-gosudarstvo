@@ -4,6 +4,7 @@ SQLite-backed store for already-notified flights.
 Prevents sending duplicate Telegram messages for the same
 (airline, origin, destination, date) combination.
 """
+import os
 import sqlite3
 import logging
 from contextlib import contextmanager
@@ -11,7 +12,7 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-DB_PATH = Path(__file__).parent / "flights.db"
+DB_PATH = Path(os.environ.get("DB_PATH") or (Path(__file__).parent / "flights.db"))
 
 _CREATE_TABLE = """
 CREATE TABLE IF NOT EXISTS notified (
