@@ -2,8 +2,8 @@ name: Subsidy Flight Monitor
 
 on:
   schedule:
-    - cron: '*/15 * * * *'   # every 15 minutes
-  workflow_dispatch:           # allow manual run from GitHub UI
+    - cron: '*/15 * * * *'   # every 15 minutes (GitHub min = 5 min, actual ~10-15 min)
+  workflow_dispatch:           # manual run from GitHub UI → Actions tab
 
 jobs:
   check-flights:
@@ -20,6 +20,7 @@ jobs:
         with:
           python-version: '3.11'
 
+      # Cache pip so subsequent runs don't re-download packages
       - name: Cache pip packages
         uses: actions/cache@v4
         with:
@@ -27,6 +28,17 @@ jobs:
           key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
           restore-keys: |
             ${{ runner.os }}-pip-
+
+      # ⚠️  CRITICAL: persist flights.db between runs so we don't re-notify
+      # Key uses run_id so every run saves a fresh snapshot;
+      # restore-keys picks up the latest previous snapshot.
+      - name: Restore notification DB
+        uses: actions/cache@v4
+        with:
+          path: flights.db
+          key: flights-db-${{ github.run_id }}
+          restore-keys: |
+            flights-db-
 
       - name: Install Python dependencies
         run: pip install -r requirements.txt
@@ -40,4 +52,9 @@ jobs:
         env:
           BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
           CHAT_ID: ${{ secrets.CHAT_ID }}
+          DAYS_AHEAD: '45'
+          MIN_DELAY: '4'
+          MAX_DELAY: '9'
         run: python main.py
+
+      # flights.db is automatically saved by actions/cache after the job
